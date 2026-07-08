@@ -1,10 +1,12 @@
 # EC2 variables
 variable "instance_type" {}
 variable "instance_name" {}
+variable "key_name" {}
+variable "public_key" {}
 # data section
 variable "os_name" {}
 variable "ami_owner" {}
-variable "virtualization_type" {default = "hvm"}
+variable "virtualization_type" { default = "hvm" }
 # security group variables
 variable "sg_name" {}
 variable "sg_description" {}

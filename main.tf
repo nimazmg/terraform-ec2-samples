@@ -29,10 +29,10 @@ data "aws_ami" "selected" {
 }
 
 resource "aws_instance" "web" {
-  ami           = data.aws_ami.selected.id
-  instance_type = var.instance_type
+  ami             = data.aws_ami.selected.id
+  instance_type   = var.instance_type
+  key_name        = var.key_name
   security_groups = [aws_security_group.web_sg.name]
-
   tags = {
     Name = var.instance_name
   }
@@ -47,6 +47,10 @@ resource "aws_security_group" "web_sg" {
     protocol    = var.protocol
     cidr_blocks = var.cidr_blocks
   }
+}
+resource "aws_key_pair" "key_pair" {
+  key_name   = var.key_name
+  public_key = var.public_key
 }
 
 
