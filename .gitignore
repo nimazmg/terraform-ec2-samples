@@ -1,7 +1,6 @@
 .terraform/
 *.tfstate
 *.tfstate.*
-terraform.tfvars
 *.tfvars
 *.tfvars.json
 crash.log
@@ -12,3 +11,4 @@ override.tf.json
 # Local editor folders
 .vscode/
 .idea/
+.terraform.lock.hcl
