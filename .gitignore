@@ -8,6 +8,7 @@ crash.log
 override.tf
 override.tf.json
 *.backup
+*.pem
 # Local editor folders
 .vscode/
 .idea/

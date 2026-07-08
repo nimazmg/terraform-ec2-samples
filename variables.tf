@@ -2,7 +2,6 @@
 variable "instance_type" {}
 variable "instance_name" {}
 variable "key_name" {}
-variable "public_key" {}
 # data section
 variable "os_name" {}
 variable "ami_owner" {}
