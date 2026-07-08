@@ -52,13 +52,14 @@ resource "local_file" "private_key" {
 }
 
 resource "aws_instance" "web" {
+  count           = var.instance_count
   ami             = data.aws_ami.selected.id
   instance_type   = var.instance_type
   key_name        = aws_key_pair.key_pair.key_name
   security_groups = [aws_security_group.web_sg.name]
 
   tags = {
-    Name = var.instance_name
+    Name = "${var.instance_name}-${count.index + 1}"
   }
 }
 

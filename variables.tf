@@ -2,6 +2,10 @@
 variable "instance_type" {}
 variable "instance_name" {}
 variable "key_name" {}
+variable "instance_count" {
+  type    = number
+  default = 1
+}
 # data section
 variable "os_name" {}
 variable "ami_owner" {}
