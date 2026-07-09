@@ -11,3 +11,4 @@ override.tf.json
 .vscode/
 .idea/
 .terraform.lock.hcl
+terraform-learning-notes-2026-07-09.md
