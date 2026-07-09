@@ -1,0 +1,64 @@
+data "aws_ami" "selected" {
+  most_recent = true
+
+  filter {
+    name   = "name"
+    values = ["${var.os_name}*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = [var.virtualization_type]
+  }
+
+  owners = [var.ami_owner]
+}
+
+resource "tls_private_key" "ssh" {
+  algorithm = var.private_key_algorithm
+  rsa_bits  = var.private_key_rsa_bits
+}
+
+resource "aws_key_pair" "main" {
+  key_name   = var.key_name
+  public_key = tls_private_key.ssh.public_key_openssh
+}
+
+resource "local_file" "private_key" {
+  content         = tls_private_key.ssh.private_key_pem
+  filename        = "${path.root}/${var.key_name}.pem"
+  file_permission = var.private_key_file_permission
+}
+
+resource "aws_placement_group" "main" {
+  name     = "${var.instance_name}-placement-group"
+  strategy = var.placement_strategy
+}
+
+resource "aws_network_interface" "eni" {
+  count           = var.instance_count
+  subnet_id       = var.subnet_id
+  private_ips     = [cidrhost(var.subnet_cidr_block, var.private_ip_start + count.index)]
+  security_groups = var.security_group_ids
+
+  tags = {
+    Name = "${var.instance_name}-eni-${count.index + 1}"
+  }
+}
+
+resource "aws_instance" "web" {
+  count           = var.instance_count
+  ami             = data.aws_ami.selected.id
+  instance_type   = var.instance_type
+  key_name        = aws_key_pair.main.key_name
+  placement_group = aws_placement_group.main.name
+
+  network_interface {
+    network_interface_id = aws_network_interface.eni[count.index].id
+    device_index         = var.primary_network_device_index
+  }
+
+  tags = {
+    Name = "${var.instance_name}-${count.index + 1}"
+  }
+}
