@@ -30,17 +30,17 @@ resource "local_file" "private_key" {
   file_permission = var.private_key_file_permission
 }
 
-resource "aws_placement_group" "main" {
-  name     = "${var.instance_name}-placement-group"
-  strategy = var.placement_strategy
-}
+# resource "aws_placement_group" "main" {
+#   name     = "${var.instance_name}-placement-group"
+#   strategy = var.placement_strategy
+# }
 
 resource "aws_instance" "web" {
   count                  = var.instance_count
   ami                    = data.aws_ami.selected.id
   instance_type          = var.instance_type
   key_name               = aws_key_pair.main.key_name
-  placement_group        = aws_placement_group.main.name
+  # placement_group        = aws_placement_group.main.name
   subnet_id              = var.subnet_id
   private_ip             = cidrhost(var.subnet_cidr_block, var.private_ip_start + count.index)
   vpc_security_group_ids = var.security_group_ids
