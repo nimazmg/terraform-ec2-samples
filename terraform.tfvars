@@ -1,15 +1,14 @@
 aws_region = "eu-central-1"
 
 # EC2 variables
-instance_type                = "t4g.micro"
-instance_name                = "web-server"
-key_name                     = "my-key"
-instance_count               = 1
-placement_strategy           = "cluster"
-private_key_algorithm        = "RSA"
-private_key_rsa_bits         = 2048
-private_key_file_permission  = "0600"
-primary_network_device_index = 0
+instance_type               = "t4g.micro"
+instance_name               = "web-server"
+key_name                    = "my-key"
+instance_count              = 1
+placement_strategy          = "cluster"
+private_key_algorithm       = "RSA"
+private_key_rsa_bits        = 2048
+private_key_file_permission = "0600"
 
 # AMI lookup variables
 os_name             = "ubuntu"

@@ -63,8 +63,7 @@ module "compute" {
   private_ip_start    = var.private_ip_start
   security_group_ids  = [module.security_group.security_group_id]
 
-  private_key_algorithm        = var.private_key_algorithm
-  private_key_rsa_bits         = var.private_key_rsa_bits
-  private_key_file_permission  = var.private_key_file_permission
-  primary_network_device_index = var.primary_network_device_index
+  private_key_algorithm       = var.private_key_algorithm
+  private_key_rsa_bits        = var.private_key_rsa_bits
+  private_key_file_permission = var.private_key_file_permission
 }

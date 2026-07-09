@@ -35,28 +35,15 @@ resource "aws_placement_group" "main" {
   strategy = var.placement_strategy
 }
 
-resource "aws_network_interface" "eni" {
-  count           = var.instance_count
-  subnet_id       = var.subnet_id
-  private_ips     = [cidrhost(var.subnet_cidr_block, var.private_ip_start + count.index)]
-  security_groups = var.security_group_ids
-
-  tags = {
-    Name = "${var.instance_name}-eni-${count.index + 1}"
-  }
-}
-
 resource "aws_instance" "web" {
-  count           = var.instance_count
-  ami             = data.aws_ami.selected.id
-  instance_type   = var.instance_type
-  key_name        = aws_key_pair.main.key_name
-  placement_group = aws_placement_group.main.name
-
-  network_interface {
-    network_interface_id = aws_network_interface.eni[count.index].id
-    device_index         = var.primary_network_device_index
-  }
+  count                  = var.instance_count
+  ami                    = data.aws_ami.selected.id
+  instance_type          = var.instance_type
+  key_name               = aws_key_pair.main.key_name
+  placement_group        = aws_placement_group.main.name
+  subnet_id              = var.subnet_id
+  private_ip             = cidrhost(var.subnet_cidr_block, var.private_ip_start + count.index)
+  vpc_security_group_ids = var.security_group_ids
 
   tags = {
     Name = "${var.instance_name}-${count.index + 1}"

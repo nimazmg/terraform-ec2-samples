@@ -72,8 +72,3 @@ variable "private_key_file_permission" {
   description = "Private key file permissions."
   type        = string
 }
-
-variable "primary_network_device_index" {
-  description = "Device index for the primary ENI."
-  type        = number
-}

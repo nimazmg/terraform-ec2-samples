@@ -4,6 +4,6 @@ output "instance_ids" {
 }
 
 output "network_interface_ids" {
-  description = "IDs of the created ENIs."
-  value       = aws_network_interface.eni[*].id
+  description = "IDs of the primary network interfaces created for the EC2 instances."
+  value       = aws_instance.web[*].primary_network_interface_id
 }

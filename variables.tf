@@ -45,11 +45,6 @@ variable "private_key_file_permission" {
   type        = string
 }
 
-variable "primary_network_device_index" {
-  description = "Device index for the primary ENI."
-  type        = number
-}
-
 # AMI lookup variables
 variable "os_name" {
   description = "AMI name prefix to search for."
