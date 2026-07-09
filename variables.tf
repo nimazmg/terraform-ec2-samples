@@ -14,6 +14,22 @@ variable "instance_name" {
   type        = string
 }
 
+variable "availability_zone" {
+  description = "Availability zone for the EC2 instance and EBS volume."
+  type        = string
+}
+
+variable "ebs_volume_size" {
+  description = "Size of the EBS volume in GiB."
+  type        = number
+}
+
+
+variable "ebs_volume_type" {
+  description = "Type of the EBS volume."
+  type        = string
+}
+
 variable "key_name" {
   description = "AWS key pair name."
   type        = string

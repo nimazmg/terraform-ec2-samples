@@ -10,6 +10,11 @@ private_key_algorithm       = "RSA"
 private_key_rsa_bits        = 2048
 private_key_file_permission = "0600"
 
+# EBS variables
+ebs_volume_size   = 8
+ebs_volume_type   = "gp3"
+availability_zone = "eu-central-1a"
+
 # AMI lookup variables
 os_name             = "ubuntu"
 ami_owner           = "099720109477"

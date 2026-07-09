@@ -23,6 +23,11 @@ variable "subnet_cidr_block" {
   type        = string
 }
 
+variable "availability_zone" {
+  description = "Availability zone for the subnet."
+  type        = string
+}
+
 variable "map_public_ip_on_launch" {
   description = "Whether instances launched in the subnet receive public IPs by default."
   type        = bool

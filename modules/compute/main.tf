@@ -36,10 +36,10 @@ resource "local_file" "private_key" {
 # }
 
 resource "aws_instance" "web" {
-  count                  = var.instance_count
-  ami                    = data.aws_ami.selected.id
-  instance_type          = var.instance_type
-  key_name               = aws_key_pair.main.key_name
+  count         = var.instance_count
+  ami           = data.aws_ami.selected.id
+  instance_type = var.instance_type
+  key_name      = aws_key_pair.main.key_name
   # placement_group        = aws_placement_group.main.name
   subnet_id              = var.subnet_id
   private_ip             = cidrhost(var.subnet_cidr_block, var.private_ip_start + count.index)
@@ -48,4 +48,21 @@ resource "aws_instance" "web" {
   tags = {
     Name = "${var.instance_name}-${count.index + 1}"
   }
+}
+resource "aws_ebs_volume" "main" {
+  count             = var.instance_count
+  availability_zone = var.availability_zone
+  size              = var.ebs_volume_size
+  type              = var.ebs_volume_type
+
+  tags = {
+    Name = "${var.instance_name}-ebs-volume-${count.index + 1}"
+  }
+}
+
+resource "aws_volume_attachment" "main" {
+  count       = var.instance_count
+  device_name = "/dev/sdf"
+  volume_id   = aws_ebs_volume.main[count.index].id
+  instance_id = aws_instance.web[count.index].id
 }
