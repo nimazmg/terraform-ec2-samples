@@ -5,6 +5,7 @@ instance_name       = "web-server"
 virtualization_type = "hvm"
 key_name            = "my-key"
 instance_count      = 1
+placement_group     = "my-placement-group"
 # data section
 os_name   = "ubuntu"
 ami_owner = "099720109477"

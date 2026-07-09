@@ -57,11 +57,19 @@ resource "aws_instance" "web" {
   instance_type   = var.instance_type
   key_name        = aws_key_pair.key_pair.key_name
   security_groups = [aws_security_group.web_sg.name]
+  placement_group = aws_placement_group.placement_group.name
 
   tags = {
     Name = "${var.instance_name}-${count.index + 1}"
   }
 }
+
+resource "aws_placement_group" "placement_group" {
+  name     = "${var.instance_name}-placement-group"
+  strategy = "cluster"
+}
+
+
 
 resource "aws_security_group" "web_sg" {
   name        = var.sg_name

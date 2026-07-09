@@ -21,3 +21,6 @@ variable "protocol" {}
 variable "aws_region" {
   description = "AWS region for the provider"
 }
+variable "placement_group" {
+  description = "Placement group for the EC2 instances"
+}
