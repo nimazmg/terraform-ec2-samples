@@ -204,6 +204,3 @@ Reformat all Terraform files:
 terraform fmt -recursive
 ```
 
-## Extra Notes
-
-See [terraform-learning-notes-2026-07-09.md](terraform-learning-notes-2026-07-09.md) for the mistakes and lessons from building this project.
