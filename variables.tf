@@ -19,6 +19,11 @@ variable "availability_zone" {
   type        = string
 }
 
+variable "secondary_availability_zone" {
+  description = "Secondary availability zone for the ALB subnet."
+  type        = string
+}
+
 variable "ebs_volume_size" {
   description = "Size of the EBS volume in GiB."
   type        = number
@@ -105,6 +110,46 @@ variable "map_public_ip_on_launch" {
 
 variable "default_route_cidr_block" {
   description = "Destination CIDR block for the default route."
+  type        = string
+}
+
+variable "target_group_port" {
+  description = "Port for the target group."
+  type        = number
+}
+
+variable "target_group_protocol" {
+  description = "Protocol for the target group."
+  type        = string
+}
+
+variable "health_check_path" {
+  description = "Path for the health check."
+  type        = string
+}
+
+variable "health_check_interval" {
+  description = "Interval for the health check."
+  type        = number
+}
+
+variable "health_check_timeout" {
+  description = "Timeout for the health check."
+  type        = number
+}
+
+variable "health_check_healthy_threshold" {
+  description = "Healthy threshold for the health check."
+  type        = number
+}
+
+variable "health_check_unhealthy_threshold" {
+  description = "Unhealthy threshold for the health check."
+  type        = number
+}
+
+variable "health_check_matcher" {
+  description = "Matcher for the health check."
   type        = string
 }
 

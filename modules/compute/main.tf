@@ -54,7 +54,7 @@ resource "aws_ebs_volume" "main" {
   availability_zone = var.availability_zone
   size              = var.ebs_volume_size
   type              = var.ebs_volume_type
-
+  encrypted = true
   tags = {
     Name = "${var.instance_name}-ebs-volume-${count.index + 1}"
   }

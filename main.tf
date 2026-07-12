@@ -22,14 +22,24 @@ provider "aws" {
 module "network" {
   source = "./modules/network"
 
-  name_prefix              = var.instance_name
-  vpc_cidr_block           = var.vpc_cidr_block
-  enable_dns_hostnames     = var.enable_dns_hostnames
-  enable_dns_support       = var.enable_dns_support
-  subnet_cidr_block        = var.subnet_cidr_block
-  availability_zone        = var.availability_zone
-  map_public_ip_on_launch  = var.map_public_ip_on_launch
-  default_route_cidr_block = var.default_route_cidr_block
+  name_prefix                      = var.instance_name
+  vpc_cidr_block                   = var.vpc_cidr_block
+  enable_dns_hostnames             = var.enable_dns_hostnames
+  enable_dns_support               = var.enable_dns_support
+  subnet_cidr_block                = var.subnet_cidr_block
+  availability_zone                = var.availability_zone
+  secondary_availability_zone      = var.secondary_availability_zone
+  map_public_ip_on_launch          = var.map_public_ip_on_launch
+  default_route_cidr_block         = var.default_route_cidr_block
+  security_group_id                = module.security_group.security_group_id
+  target_group_port                = var.target_group_port
+  target_group_protocol            = var.target_group_protocol
+  health_check_path                = var.health_check_path
+  health_check_interval            = var.health_check_interval
+  health_check_timeout             = var.health_check_timeout
+  health_check_healthy_threshold   = var.health_check_healthy_threshold
+  health_check_unhealthy_threshold = var.health_check_unhealthy_threshold
+  health_check_matcher             = var.health_check_matcher
 }
 
 module "security_group" {
@@ -69,4 +79,22 @@ module "compute" {
   private_key_algorithm       = var.private_key_algorithm
   private_key_rsa_bits        = var.private_key_rsa_bits
   private_key_file_permission = var.private_key_file_permission
+}
+
+resource "aws_lb_target_group_attachment" "compute" {
+  count            = length(module.compute.instance_ids)
+  target_group_arn = module.network.target_group_arn
+  target_id        = module.compute.instance_ids[count.index]
+  port             = var.target_group_port
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = module.network.alb_arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = module.network.target_group_arn
+  }
 }
