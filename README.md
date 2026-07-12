@@ -1,21 +1,17 @@
 # Terraform EC2 AWS Project
 
-This is a learning Terraform project that provisions a small AWS EC2 environment using local Terraform modules.
-
-The root module is kept mostly as wiring. The actual resources are split into separate modules for networking, security groups, and compute.
+This repository is a learning Terraform project that provisions a small AWS environment using local modules. The root module wires module inputs/outputs; resources live in `modules/`.
 
 ## What This Creates
 
-- A VPC
-- An internet gateway
-- A subnet in a selected Availability Zone
-- A route table and route table association
-- A security group with configurable ingress and egress rules
-- An EC2 instance
-- An SSH key pair
-- A local private key file
-- An EBS volume
-- An EBS volume attachment from the volume to the EC2 instance
+- VPC and internet gateway
+- Two public subnets (one per AZ) used by the Application Load Balancer
+- Route table and associations
+- Security group with configurable ingress/egress rules
+- Application Load Balancer, target group, and listener
+- EC2 instances (compute module)
+- SSH keypair and local `.pem` file
+- EBS volumes and attachments
 
 ## Project Structure
 
@@ -45,15 +41,13 @@ The root module is kept mostly as wiring. The actual resources are split into se
 
 ### Network Module
 
-The `modules/network` module creates:
+The `modules/network` module creates the network resources used by the rest of the project. Key points:
 
-- VPC
-- Internet gateway
-- Subnet
-- Route table
-- Route table association
+- **VPC:** single VPC for the project.
+- **Subnets:** two public subnets in different Availability Zones for ALB high-availability.
+- **Internet gateway, route table, associations.**
 
-The subnet is pinned to the configured Availability Zone so the EC2 instance and EBS volume can be created in the same zone.
+The module exposes `vpc_id`, `subnet_id` (primary), and ALB outputs (`alb_arn`, `target_group_arn`).
 
 ### Security Group Module
 
@@ -76,11 +70,11 @@ The `modules/compute` module creates:
 
 The EBS volume is attached to the matching EC2 instance using `count.index`.
 
+This project currently attaches instances to a single subnet (module input). For HA across AZs, extend the compute module to deploy instances into multiple subnets.
+
 ## Important Variables
 
-Edit values in `terraform.tfvars` before applying.
-
-Example:
+Edit values in `terraform.tfvars` before applying. Example values:
 
 ```hcl
 aws_region        = "eu-central-1"
@@ -102,6 +96,8 @@ Availability Zone: eu-central-1a
 ```
 
 EBS volumes can only attach to EC2 instances in the same Availability Zone.
+
+For the ALB, AWS requires at least two subnets in different Availability Zones. This project adds `secondary_availability_zone` and a second subnet; set it in `terraform.tfvars` (for example `eu-central-1b`).
 
 ## Usage
 
@@ -134,6 +130,8 @@ Apply the infrastructure:
 ```powershell
 terraform apply
 ```
+
+If you prefer a safe preview-run, use `terraform plan` before `terraform apply`.
 
 Destroy the infrastructure when finished:
 
