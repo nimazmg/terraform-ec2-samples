@@ -44,7 +44,7 @@ resource "aws_instance" "web" {
   subnet_id              = var.subnet_id
   private_ip             = cidrhost(var.subnet_cidr_block, var.private_ip_start + count.index)
   vpc_security_group_ids = var.security_group_ids
-
+  user_data              = file("${path.module}/user_data.sh")
   tags = {
     Name = "${var.instance_name}-${count.index + 1}"
   }
