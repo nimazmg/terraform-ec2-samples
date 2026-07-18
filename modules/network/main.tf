@@ -86,4 +86,4 @@ resource "aws_lb_target_group" "main" {
   tags = {
     Name = "${var.name_prefix}-tg"
   }
- }
+}

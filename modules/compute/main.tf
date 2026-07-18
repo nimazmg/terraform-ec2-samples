@@ -60,8 +60,8 @@ resource "aws_security_group" "efs" {
 }
 
 resource "aws_efs_file_system" "main" {
-  creation_token = "${var.instance_name}-efs"
-  encrypted      = true
+  creation_token  = "${var.instance_name}-efs"
+  encrypted       = true
   throughput_mode = "bursting"
 
   lifecycle_policy {
@@ -102,7 +102,7 @@ resource "aws_ebs_volume" "main" {
   availability_zone = var.availability_zone
   size              = var.ebs_volume_size
   type              = var.ebs_volume_type
-  encrypted        = true
+  encrypted         = true
 
   tags = {
     Name = "${var.instance_name}-ebs-volume-${count.index + 1}"
