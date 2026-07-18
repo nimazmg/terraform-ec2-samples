@@ -7,9 +7,10 @@ override.tf
 override.tf.json
 *.backup
 *.pem
+
 # Local editor folders
 .vscode/
 .idea/
-.terraform.lock.hcl
-terraform-learning-notes-2026-07-09.md
-.terraform.lock.hcl
+
+# Local learning notes
+terraform-learning-notes-*.md

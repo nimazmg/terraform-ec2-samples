@@ -1,204 +1,173 @@
-# Terraform EC2 AWS Project
+# Modular EC2 Web Stack on AWS
 
-This repository is a learning Terraform project that provisions a small AWS environment using local modules. The root module wires module inputs/outputs; resources live in `modules/`.
+This Terraform root module creates a small web stack and composes focused,
+reusable child modules. The root configuration contains only environment
+choices; each child module owns one infrastructure concern.
 
-## What This Creates
+## Architecture
 
-- VPC and internet gateway
-- Two public subnets (one per AZ) used by the Application Load Balancer
-- Route table and associations
-- Security group with configurable ingress/egress rules
-- Application Load Balancer, target group, and listener
-- EC2 instances (compute module)
-- SSH keypair and local `.pem` file
-- EBS volumes and attachments
+```text
+network
+  |
+  +-- ALB security group --> load balancer
+  |
+  +-- application security group --> EC2 instances
+          |
+          +-- EFS security group --> EFS mount targets
+```
+
+The stack includes:
+
+- One VPC, an internet gateway, and public subnets in at least two AZs
+- Separate least-privilege security groups for the ALB, instances, and EFS
+- An Application Load Balancer, target group, listener, and registrations
+- One or more EC2 instances with optional encrypted EBS data volumes
+- An encrypted EFS file system with one mount target per configured subnet
+- An optional Terraform-generated EC2 SSH key
 
 ## Project Structure
 
 ```text
 .
-|-- main.tf
-|-- variables.tf
+|-- main.tf                 # Root module composition only
+|-- variables.tf            # Grouped environment-level inputs
+|-- outputs.tf              # Useful connection and resource details
+|-- providers.tf
+|-- versions.tf
+|-- locals.tf
+|-- moved.tf                # State-address migrations from the old layout
 |-- terraform.tfvars
-|-- README.md
-|-- terraform-learning-notes-2026-07-09.md
-`-- modules
-    |-- compute
-    |   |-- main.tf
-    |   |-- outputs.tf
-    |   `-- variables.tf
-    |-- network
-    |   |-- main.tf
-    |   |-- outputs.tf
-    |   `-- variables.tf
-    `-- security_group
-        |-- main.tf
-        |-- outputs.tf
-        `-- variables.tf
+|-- .terraform.lock.hcl     # Reproducible provider selections
+|-- templates/
+|   `-- user_data.sh
+|-- tests/
+|   `-- stack.tftest.hcl    # Credential-free composition test
+`-- modules/
+    |-- compute/
+    |-- efs/
+    |-- load_balancer/
+    |-- network/
+    |-- security_group/
+    `-- ssh_key/
 ```
 
-## Modules
+## Configure
 
-### Network Module
-
-The `modules/network` module creates the network resources used by the rest of the project. Key points:
-
-- **VPC:** single VPC for the project.
-- **Subnets:** two public subnets in different Availability Zones for ALB high-availability.
-- **Internet gateway, route table, associations.**
-
-The module exposes `vpc_id`, `subnet_id` (primary), and ALB outputs (`alb_arn`, `target_group_arn`).
-
-### Security Group Module
-
-The `modules/security_group` module creates one security group with configurable:
-
-- Ingress rules for inbound traffic
-- Egress rules for outbound traffic
-
-### Compute Module
-
-The `modules/compute` module creates:
-
-- Ubuntu AMI lookup
-- TLS private key
-- AWS key pair
-- Local `.pem` private key file
-- EC2 instance
-- EBS volume
-- EBS volume attachment
-
-The EBS volume is attached to the matching EC2 instance using `count.index`.
-
-This project currently attaches instances to a single subnet (module input). For HA across AZs, extend the compute module to deploy instances into multiple subnets.
-
-## Important Variables
-
-Edit values in `terraform.tfvars` before applying. Example values:
+Most settings have safe defaults. The only topology-specific input is the
+subnet map in `terraform.tfvars`:
 
 ```hcl
-aws_region        = "eu-central-1"
-availability_zone = "eu-central-1a"
+network = {
+  vpc_cidr_block = "10.0.0.0/16"
 
-instance_type  = "t4g.micro"
-instance_name  = "web-server"
-instance_count = 1
-
-ebs_volume_size = 8
-ebs_volume_type = "gp3"
+  public_subnets = {
+    primary = {
+      cidr_block        = "10.0.0.0/24"
+      availability_zone = "eu-central-1a"
+    }
+    secondary = {
+      cidr_block        = "10.0.1.0/24"
+      availability_zone = "eu-central-1b"
+    }
+  }
+}
 ```
 
-Important: `aws_region` and `availability_zone` are different.
+Subnets default to assigning public IPs because this training stack does not
+create a NAT gateway. Inbound traffic to instances is still restricted to the
+ALB security group. To enable SSH, explicitly set trusted source CIDRs:
 
-```text
-Region:            eu-central-1
-Availability Zone: eu-central-1a
+```hcl
+compute = {
+  ssh_allowed_cidr_blocks = ["203.0.113.10/32"]
+}
 ```
 
-EBS volumes can only attach to EC2 instances in the same Availability Zone.
+Never open SSH to `0.0.0.0/0`.
 
-For the ALB, AWS requires at least two subnets in different Availability Zones. This project adds `secondary_availability_zone` and a second subnet; set it in `terraform.tfvars` (for example `eu-central-1b`).
+The default AMI search selects Ubuntu 22.04 on x86_64. When changing to an ARM
+instance type such as `t4g.micro`, also change `compute.ami.architecture` and
+the AMI name pattern. For stable environments, pin an image instead of using
+the `most_recent` lookup:
 
-## Usage
+```hcl
+compute = {
+  ami_id = "ami-0123456789abcdef0"
+}
+```
 
-Initialize Terraform:
+## Use
 
 ```powershell
 terraform init
-```
-
-Format the configuration:
-
-```powershell
 terraform fmt -recursive
-```
-
-Validate the configuration:
-
-```powershell
 terraform validate
-```
-
-Preview the changes:
-
-```powershell
+terraform test
 terraform plan
-```
-
-Apply the infrastructure:
-
-```powershell
 terraform apply
 ```
 
-If you prefer a safe preview-run, use `terraform plan` before `terraform apply`.
+`terraform test` uses mock providers, so it verifies the full module
+composition without creating resources or requiring AWS credentials.
 
-Destroy the infrastructure when finished:
+After apply, Terraform prints `application_url`, instance addresses, subnet
+IDs, and EFS details:
+
+```powershell
+terraform output application_url
+```
+
+Destroy the training environment when it is no longer needed:
 
 ```powershell
 terraform destroy
 ```
 
-## Notes for Learning
+## Reusing an Existing SSH Key
 
-Terraform modules do not automatically share variables. If a child module uses `var.example`, that child module must declare `variable "example"` in its own `variables.tf`, and the root module must pass the value into the module block.
-
-Example:
+Terraform creates a key by default so the example is self-contained. To reuse
+an existing EC2 key pair instead:
 
 ```hcl
-module "compute" {
-  source = "./modules/compute"
-
-  availability_zone = var.availability_zone
+compute = {
+  create_ssh_key = false
+  ssh_key_name   = "existing-key-name"
 }
 ```
 
-Cluster placement groups are not needed for this simple EC2 project. Small instance types such as `t4g.micro` do not support every placement group strategy.
+Generated private key material is stored in Terraform state and written to a
+local `.pem` file. Protect the state as sensitive data; for production, prefer
+an existing key or AWS Systems Manager Session Manager.
 
-If you change from `t4g.micro` to `t2.micro`, remember that they use different CPU architectures:
+## Module Boundaries
 
-```text
-t4g.micro = ARM
-t2.micro  = x86_64
-```
+- `network` owns only VPC, subnet, gateway, route-table, and association
+  resources.
+- `security_group` is generic and can be instantiated for any role.
+- `efs` owns the file system, NFS security group, and per-subnet mount targets.
+- `compute` accepts an AMI ID and user data, and owns EC2/EBS resources only.
+- `ssh_key` optionally creates and stores an EC2 key pair.
+- `load_balancer` owns the ALB, target group, listener, and target attachments.
 
-Make sure the selected AMI matches the instance architecture.
+This produces a one-way dependency graph and lets each module be reused or
+replaced independently.
 
-## Safety Notes
+## Existing-State Migration
 
-Do not commit sensitive files to GitHub, especially:
+`moved.tf` maps the old resource addresses to the new module addresses. Its
+subnet migrations assume the supplied `primary` and `secondary` keys. If an
+existing environment uses different keys, adjust those moves before planning.
 
-- Terraform state files: `terraform.tfstate`
-- Terraform state backups: `terraform.tfstate.backup`
-- Private key files: `*.pem`
-- Local Terraform cache: `.terraform/`
-- Real secrets or credentials
+Always review the first migration plan carefully. The refactor intentionally
+adds a dedicated application security group, adds an EFS mount target in the
+second AZ, enables instance public IPs so package installation works without a
+NAT gateway, and removes the old unused duplicate EFS security group. Those
+changes are expected even when all address moves are recognized.
 
-This project creates a local private key file using the configured `key_name`. Keep that file private.
+The first migration can replace EC2 instances because public-IP assignment,
+the AMI selection, and first-boot user data changed. Schedule downtime and
+back up anything stored on instance root volumes before applying. Separate EBS
+data volumes retain their stable resource addresses.
 
-## Helpful Commands
-
-Check what Terraform will create or change:
-
-```powershell
-terraform plan
-```
-
-Check all resources managed by Terraform:
-
-```powershell
-terraform state list
-```
-
-Show details for one resource:
-
-```powershell
-terraform state show <resource_address>
-```
-
-Reformat all Terraform files:
-
-```powershell
-terraform fmt -recursive
-```
-
+Do not commit state, `.pem` files, credentials, or secrets. The provider lock
+file should be committed so provider selections remain repeatable.

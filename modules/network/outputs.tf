@@ -1,19 +1,19 @@
 output "vpc_id" {
-  description = "ID of the created VPC."
+  description = "ID of the VPC."
   value       = aws_vpc.main.id
 }
 
-output "subnet_id" {
-  description = "ID of the created subnet."
-  value       = aws_subnet.main.id
+output "public_subnet_ids" {
+  description = "Public subnet IDs keyed by the caller-selected subnet names."
+  value       = { for key, subnet in aws_subnet.public : key => subnet.id }
 }
 
-output "target_group_arn" {
-  description = "ARN of the created target group."
-  value       = aws_lb_target_group.main.arn
+output "public_subnet_arns" {
+  description = "Public subnet ARNs keyed by the caller-selected subnet names."
+  value       = { for key, subnet in aws_subnet.public : key => subnet.arn }
 }
 
-output "alb_arn" {
-  description = "ARN of the created Application Load Balancer."
-  value       = aws_alb.main.arn
+output "public_route_table_id" {
+  description = "ID of the public route table."
+  value       = aws_route_table.public.id
 }

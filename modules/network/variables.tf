@@ -4,78 +4,68 @@ variable "name_prefix" {
 }
 
 variable "vpc_cidr_block" {
-  description = "CIDR block for the VPC."
+  description = "IPv4 CIDR block for the VPC."
   type        = string
+
+  validation {
+    condition     = can(cidrnetmask(var.vpc_cidr_block))
+    error_message = "vpc_cidr_block must be a valid IPv4 CIDR block."
+  }
 }
 
-variable "enable_dns_hostnames" {
-  description = "Enable DNS hostnames in the VPC."
-  type        = bool
-}
+variable "public_subnets" {
+  description = "Public subnets keyed by stable, caller-selected names."
+  type = map(object({
+    cidr_block              = string
+    availability_zone       = string
+    map_public_ip_on_launch = optional(bool, true)
+  }))
 
-variable "enable_dns_support" {
-  description = "Enable DNS support in the VPC."
-  type        = bool
-}
+  validation {
+    condition     = length(var.public_subnets) > 0
+    error_message = "At least one public subnet is required."
+  }
 
-variable "subnet_cidr_block" {
-  description = "CIDR block for the subnet."
-  type        = string
-}
+  validation {
+    condition = alltrue([
+      for subnet in values(var.public_subnets) :
+      can(cidrnetmask(subnet.cidr_block))
+    ])
+    error_message = "Every public subnet must use a valid IPv4 CIDR block."
+  }
 
-variable "availability_zone" {
-  description = "Availability zone for the primary subnet."
-  type        = string
-}
+  validation {
+    condition = (
+      length(distinct([
+        for subnet in values(var.public_subnets) : subnet.cidr_block
+      ])) == length(var.public_subnets)
+    )
+    error_message = "Public subnet CIDR blocks must be unique."
+  }
 
-variable "secondary_availability_zone" {
-  description = "Availability zone for the secondary subnet."
-  type        = string
-}
-
-variable "map_public_ip_on_launch" {
-  description = "Whether instances launched in the subnet receive public IPs by default."
-  type        = bool
+  validation {
+    condition = (
+      length(distinct([
+        for subnet in values(var.public_subnets) : subnet.availability_zone
+      ])) == length(var.public_subnets)
+    )
+    error_message = "Each public subnet must use a different availability zone."
+  }
 }
 
 variable "default_route_cidr_block" {
-  description = "Destination CIDR block for the default route."
+  description = "Destination CIDR block routed through the internet gateway."
   type        = string
+  default     = "0.0.0.0/0"
+
+  validation {
+    condition     = can(cidrnetmask(var.default_route_cidr_block))
+    error_message = "default_route_cidr_block must be a valid IPv4 CIDR block."
+  }
 }
-# target group variables
-variable "target_group_port" {
-  description = "Port for the target group."
-  type        = number
-}
-variable "target_group_protocol" {
-  description = "Protocol for the target group."
-  type        = string
-}
-variable "health_check_path" {
-  description = "Path for the health check."
-  type        = string
-}
-variable "health_check_interval" {
-  description = "Interval for the health check."
-  type        = number
-}
-variable "health_check_timeout" {
-  description = "Timeout for the health check."
-  type        = number
-}
-variable "health_check_healthy_threshold" {
-  description = "Healthy threshold for the health check."
-  type        = number
-}
-variable "health_check_unhealthy_threshold" {
-  description = "Unhealthy threshold for the health check."
-  type        = number
-}
-variable "health_check_matcher" {
-  description = "Matcher for the health check."
-  type        = string
-}
-variable "security_group_id" {
-  description = "ID of the security group to associate with the ALB."
-  type        = string
+
+variable "tags" {
+  description = "Additional tags for supported resources."
+  type        = map(string)
+  default     = {}
 }

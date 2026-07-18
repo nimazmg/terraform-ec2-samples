@@ -1,117 +1,67 @@
-data "aws_ami" "selected" {
-  most_recent = true
-
-  filter {
-    name   = "name"
-    values = ["${var.os_name}*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = [var.virtualization_type]
-  }
-
-  owners = [var.ami_owner]
-}
-
 data "aws_subnet" "selected" {
   id = var.subnet_id
 }
 
-resource "tls_private_key" "ssh" {
-  algorithm = var.private_key_algorithm
-  rsa_bits  = var.private_key_rsa_bits
-}
-
-resource "aws_key_pair" "main" {
-  key_name   = var.key_name
-  public_key = tls_private_key.ssh.public_key_openssh
-}
-
-resource "local_file" "private_key" {
-  content         = tls_private_key.ssh.private_key_pem
-  filename        = "${path.root}/${var.key_name}.pem"
-  file_permission = var.private_key_file_permission
-}
-
-# resource "aws_placement_group" "main" {
-#   name     = "${var.instance_name}-placement-group"
-#   strategy = var.placement_strategy
-# }
-
-resource "aws_security_group" "efs" {
-  name        = "${var.instance_name}-efs-sg"
-  description = "Allow NFS traffic from EC2 instances"
-  vpc_id      = data.aws_subnet.selected.vpc_id
-
-  ingress {
-    from_port       = 2049
-    to_port         = 2049
-    protocol        = "tcp"
-    security_groups = var.security_group_ids
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-resource "aws_efs_file_system" "main" {
-  creation_token = "${var.instance_name}-efs"
-  encrypted      = true
-  throughput_mode = "bursting"
-
-  lifecycle_policy {
-    transition_to_ia = "AFTER_30_DAYS"
-  }
-
-  tags = {
-    Name = "${var.instance_name}-efs"
-  }
-}
-
-resource "aws_efs_mount_target" "main" {
-  file_system_id  = aws_efs_file_system.main.id
-  subnet_id       = var.subnet_id
-  security_groups = [aws_security_group.efs.id]
-}
-
 resource "aws_instance" "web" {
-  count         = var.instance_count
-  ami           = data.aws_ami.selected.id
-  instance_type = var.instance_type
-  key_name      = aws_key_pair.main.key_name
-  # placement_group        = aws_placement_group.main.name
-  subnet_id              = var.subnet_id
-  private_ip             = cidrhost(var.subnet_cidr_block, var.private_ip_start + count.index)
-  vpc_security_group_ids = var.security_group_ids
-  user_data = templatefile("${path.module}/user_data.sh", {
-    efs_dns_name = aws_efs_file_system.main.dns_name
+  count = var.instance_count
+
+  ami                         = var.ami_id
+  instance_type               = var.instance_type
+  key_name                    = var.key_name
+  subnet_id                   = var.subnet_id
+  associate_public_ip_address = var.associate_public_ip_address
+  private_ip = (
+    var.private_ip_start == null
+    ? null
+    : cidrhost(data.aws_subnet.selected.cidr_block, var.private_ip_start + count.index)
+  )
+  vpc_security_group_ids      = var.security_group_ids
+  user_data                   = var.user_data
+  user_data_replace_on_change = var.user_data_replace_on_change
+
+  metadata_options {
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-${count.index + 1}"
   })
 
-  tags = {
-    Name = "${var.instance_name}-${count.index + 1}"
+  lifecycle {
+    precondition {
+      condition = (
+        var.private_ip_start == null ||
+        try(
+          cidrhost(
+            data.aws_subnet.selected.cidr_block,
+            var.private_ip_start + count.index
+          ) != cidrhost(data.aws_subnet.selected.cidr_block, -1),
+          false
+        )
+      )
+      error_message = "The calculated private IP must fit in the subnet and avoid its reserved final address."
+    }
   }
 }
 
 resource "aws_ebs_volume" "main" {
-  count             = var.instance_count
-  availability_zone = var.availability_zone
-  size              = var.ebs_volume_size
-  type              = var.ebs_volume_type
-  encrypted        = true
+  count = var.data_volume.enabled ? var.instance_count : 0
 
-  tags = {
-    Name = "${var.instance_name}-ebs-volume-${count.index + 1}"
-  }
+  availability_zone = data.aws_subnet.selected.availability_zone
+  size              = var.data_volume.size
+  type              = var.data_volume.type
+  encrypted         = var.data_volume.encrypted
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-data-${count.index + 1}"
+  })
 }
 
 resource "aws_volume_attachment" "main" {
-  count       = var.instance_count
-  device_name = "/dev/sdf"
+  count = var.data_volume.enabled ? var.instance_count : 0
+
+  device_name = var.data_volume.device_name
   volume_id   = aws_ebs_volume.main[count.index].id
   instance_id = aws_instance.web[count.index].id
 }
