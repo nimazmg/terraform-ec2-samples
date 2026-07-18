@@ -87,3 +87,8 @@ variable "private_key_file_permission" {
   description = "Private key file permissions."
   type        = string
 }
+
+variable "aws_region" {
+  description = "AWS region for the EFS file system."
+  type        = string
+}

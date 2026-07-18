@@ -14,6 +14,10 @@ data "aws_ami" "selected" {
   owners = [var.ami_owner]
 }
 
+data "aws_subnet" "selected" {
+  id = var.subnet_id
+}
+
 resource "tls_private_key" "ssh" {
   algorithm = var.private_key_algorithm
   rsa_bits  = var.private_key_rsa_bits
@@ -35,6 +39,46 @@ resource "local_file" "private_key" {
 #   strategy = var.placement_strategy
 # }
 
+resource "aws_security_group" "efs" {
+  name        = "${var.instance_name}-efs-sg"
+  description = "Allow NFS traffic from EC2 instances"
+  vpc_id      = data.aws_subnet.selected.vpc_id
+
+  ingress {
+    from_port       = 2049
+    to_port         = 2049
+    protocol        = "tcp"
+    security_groups = var.security_group_ids
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_efs_file_system" "main" {
+  creation_token = "${var.instance_name}-efs"
+  encrypted      = true
+  throughput_mode = "bursting"
+
+  lifecycle_policy {
+    transition_to_ia = "AFTER_30_DAYS"
+  }
+
+  tags = {
+    Name = "${var.instance_name}-efs"
+  }
+}
+
+resource "aws_efs_mount_target" "main" {
+  file_system_id  = aws_efs_file_system.main.id
+  subnet_id       = var.subnet_id
+  security_groups = [aws_security_group.efs.id]
+}
+
 resource "aws_instance" "web" {
   count         = var.instance_count
   ami           = data.aws_ami.selected.id
@@ -44,17 +88,22 @@ resource "aws_instance" "web" {
   subnet_id              = var.subnet_id
   private_ip             = cidrhost(var.subnet_cidr_block, var.private_ip_start + count.index)
   vpc_security_group_ids = var.security_group_ids
-  user_data              = file("${path.module}/user_data.sh")
+  user_data = templatefile("${path.module}/user_data.sh", {
+    efs_dns_name = aws_efs_file_system.main.dns_name
+  })
+
   tags = {
     Name = "${var.instance_name}-${count.index + 1}"
   }
 }
+
 resource "aws_ebs_volume" "main" {
   count             = var.instance_count
   availability_zone = var.availability_zone
   size              = var.ebs_volume_size
   type              = var.ebs_volume_type
-  encrypted = true
+  encrypted        = true
+
   tags = {
     Name = "${var.instance_name}-ebs-volume-${count.index + 1}"
   }

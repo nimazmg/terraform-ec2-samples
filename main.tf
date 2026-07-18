@@ -56,6 +56,8 @@ module "security_group" {
   egress_to_port      = var.egress_to_port
   egress_protocol     = var.egress_protocol
   egress_cidr_blocks  = var.egress_cidr_blocks
+  name_sg_efs         = var.name_sg_efs
+  description_sg_efs  = var.description_sg_efs
 }
 
 module "compute" {
@@ -79,6 +81,7 @@ module "compute" {
   private_key_algorithm       = var.private_key_algorithm
   private_key_rsa_bits        = var.private_key_rsa_bits
   private_key_file_permission = var.private_key_file_permission
+  aws_region                  = var.aws_region
 }
 
 resource "aws_lb_target_group_attachment" "compute" {

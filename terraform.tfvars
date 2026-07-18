@@ -51,3 +51,7 @@ egress_from_port   = 0
 egress_to_port     = 0
 egress_protocol    = "-1"
 egress_cidr_blocks = ["0.0.0.0/0"]
+
+# EFS variables
+name_sg_efs        = "efs-sg"
+description_sg_efs = "Allow EFS traffic from EC2 instances"

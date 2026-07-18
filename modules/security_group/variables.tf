@@ -52,3 +52,13 @@ variable "egress_cidr_blocks" {
   description = "Egress CIDR blocks."
   type        = list(string)
 }
+
+variable "name_sg_efs" {
+  description = "Security group name for EFS."
+  type        = string
+}
+
+variable "description_sg_efs" {
+  description = "Security group description for EFS."
+  type        = string
+}
