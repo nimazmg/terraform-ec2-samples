@@ -1,57 +1,45 @@
-aws_region = "eu-central-1"
+aws_region   = "eu-central-1"
+project_name = "web-server"
 
-# EC2 variables
-instance_type               = "t2.micro"
-instance_name               = "web-server"
-key_name                    = "my-key"
-instance_count              = 2
-placement_strategy          = "cluster"
-private_key_algorithm       = "RSA"
-private_key_rsa_bits        = 2048
-private_key_file_permission = "0600"
+network = {
+  vpc_cidr_block = "10.0.0.0/16"
 
-# EBS variables
-ebs_volume_size             = 8
-ebs_volume_type             = "gp3"
-availability_zone           = "eu-central-1a"
-secondary_availability_zone = "eu-central-1b"
+  public_subnets = {
+    primary = {
+      cidr_block        = "10.0.0.0/24"
+      availability_zone = "eu-central-1a"
+    }
+    secondary = {
+      cidr_block        = "10.0.1.0/24"
+      availability_zone = "eu-central-1b"
+    }
+  }
+}
 
-# AMI lookup variables
-os_name             = "ubuntu"
-ami_owner           = "099720109477"
-virtualization_type = "hvm"
+compute = {
+  instance_type    = "t2.micro"
+  instance_count   = 2
+  subnet_key       = "primary"
+  private_ip_start = 10
 
-# Network variables
-vpc_cidr_block           = "10.0.0.0/16"
-enable_dns_hostnames     = true
-enable_dns_support       = true
-subnet_cidr_block        = "10.0.0.0/24"
-map_public_ip_on_launch  = false
-default_route_cidr_block = "0.0.0.0/0"
-private_ip_start         = 10
-#LB variables
+  # Set create_ssh_key = false to reuse an existing EC2 key pair.
+  create_ssh_key = true
+  ssh_key_name   = "my-key"
 
-target_group_port                = 80
-target_group_protocol            = "HTTP"
-health_check_path                = "/"
-health_check_interval            = 30
-health_check_timeout             = 5
-health_check_healthy_threshold   = 2
-health_check_unhealthy_threshold = 2
-health_check_matcher             = "200-299"
+  data_volume = {
+    size = 8
+    type = "gp3"
+  }
+}
 
-# Security group variables
-sg_name            = "web-sg"
-sg_description     = "Allow HTTP traffic"
-start_port         = 80
-end_port           = 80
-cidr_blocks        = ["0.0.0.0/0"]
-protocol           = "tcp"
-egress_from_port   = 0
-egress_to_port     = 0
-egress_protocol    = "-1"
-egress_cidr_blocks = ["0.0.0.0/0"]
+application = {
+  listener_port = 80
+  target_port   = 80
 
-# EFS variables
-name_sg_efs        = "efs-sg"
-description_sg_efs = "Allow EFS traffic from EC2 instances"
+  # Replace this with trusted CIDRs when the application should not be public.
+  allowed_cidr_blocks = ["0.0.0.0/0"]
+}
+
+tags = {
+  Environment = "training"
+}

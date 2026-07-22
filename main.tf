@@ -1,103 +1,132 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
-    tls = {
-      source  = "hashicorp/tls"
-      version = "~> 4.0"
-    }
-    local = {
-      source  = "hashicorp/local"
-      version = "~> 2.0"
-    }
-  }
-}
+data "aws_ami" "selected" {
+  count = var.compute.ami_id == null ? 1 : 0
 
-provider "aws" {
-  region = var.aws_region
+  most_recent = true
+  owners      = var.compute.ami.owners
+
+  filter {
+    name   = "name"
+    values = [var.compute.ami.name_pattern]
+  }
+
+  filter {
+    name   = "architecture"
+    values = [var.compute.ami.architecture]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = [var.compute.ami.virtualization_type]
+  }
+
+  filter {
+    name   = "root-device-type"
+    values = ["ebs"]
+  }
 }
 
 module "network" {
   source = "./modules/network"
 
-  name_prefix                      = var.instance_name
-  vpc_cidr_block                   = var.vpc_cidr_block
-  enable_dns_hostnames             = var.enable_dns_hostnames
-  enable_dns_support               = var.enable_dns_support
-  subnet_cidr_block                = var.subnet_cidr_block
-  availability_zone                = var.availability_zone
-  secondary_availability_zone      = var.secondary_availability_zone
-  map_public_ip_on_launch          = var.map_public_ip_on_launch
-  default_route_cidr_block         = var.default_route_cidr_block
-  security_group_id                = module.security_group.security_group_id
-  target_group_port                = var.target_group_port
-  target_group_protocol            = var.target_group_protocol
-  health_check_path                = var.health_check_path
-  health_check_interval            = var.health_check_interval
-  health_check_timeout             = var.health_check_timeout
-  health_check_healthy_threshold   = var.health_check_healthy_threshold
-  health_check_unhealthy_threshold = var.health_check_unhealthy_threshold
-  health_check_matcher             = var.health_check_matcher
+  name_prefix              = var.project_name
+  vpc_cidr_block           = var.network.vpc_cidr_block
+  public_subnets           = var.network.public_subnets
+  default_route_cidr_block = var.network.default_route_cidr_block
 }
 
-module "security_group" {
+module "alb_security_group" {
   source = "./modules/security_group"
 
-  name                = var.sg_name
-  description         = var.sg_description
-  vpc_id              = module.network.vpc_id
-  ingress_from_port   = var.start_port
-  ingress_to_port     = var.end_port
-  ingress_protocol    = var.protocol
-  ingress_cidr_blocks = var.cidr_blocks
-  egress_from_port    = var.egress_from_port
-  egress_to_port      = var.egress_to_port
-  egress_protocol     = var.egress_protocol
-  egress_cidr_blocks  = var.egress_cidr_blocks
-  name_sg_efs         = var.name_sg_efs
-  description_sg_efs  = var.description_sg_efs
+  name        = "${var.project_name}-alb-sg"
+  description = "Allow public HTTP traffic to the application load balancer"
+  vpc_id      = module.network.vpc_id
+
+  ingress_rules = length(var.application.allowed_cidr_blocks) == 0 ? [] : [
+    {
+      description = "HTTP from allowed networks"
+      from_port   = var.application.listener_port
+      to_port     = var.application.listener_port
+      protocol    = "tcp"
+      cidr_blocks = var.application.allowed_cidr_blocks
+    }
+  ]
+}
+
+module "application_security_group" {
+  source = "./modules/security_group"
+
+  name        = "${var.project_name}-app-sg"
+  description = "Allow application traffic from the load balancer"
+  vpc_id      = module.network.vpc_id
+
+  ingress_rules = concat(
+    [
+      {
+        description        = "Application traffic from the load balancer"
+        from_port          = var.application.target_port
+        to_port            = var.application.target_port
+        protocol           = "tcp"
+        security_group_ids = [module.alb_security_group.id]
+      }
+    ],
+    length(var.compute.ssh_allowed_cidr_blocks) == 0 ? [] : [
+      {
+        description = "SSH from explicitly allowed networks"
+        from_port   = 22
+        to_port     = 22
+        protocol    = "tcp"
+        cidr_blocks = var.compute.ssh_allowed_cidr_blocks
+      }
+    ]
+  )
+}
+
+module "efs" {
+  source = "./modules/efs"
+
+  name_prefix                = var.project_name
+  vpc_id                     = module.network.vpc_id
+  subnet_ids                 = module.network.public_subnet_ids
+  allowed_security_group_ids = [module.application_security_group.id]
+}
+
+module "ssh_key" {
+  source = "./modules/ssh_key"
+
+  create               = var.compute.create_ssh_key
+  key_name             = local.ssh_key_name
+  private_key_filename = "${path.root}/${local.ssh_key_name}.pem"
+  rsa_bits             = var.compute.ssh_key_rsa_bits
 }
 
 module "compute" {
   source = "./modules/compute"
 
-  os_name                     = var.os_name
-  ami_owner                   = var.ami_owner
-  virtualization_type         = var.virtualization_type
-  key_name                    = var.key_name
-  instance_count              = var.instance_count
-  instance_type               = var.instance_type
-  instance_name               = var.instance_name
-  placement_strategy          = var.placement_strategy
-  subnet_id                   = module.network.subnet_id
-  subnet_cidr_block           = var.subnet_cidr_block
-  private_ip_start            = var.private_ip_start
-  security_group_ids          = [module.security_group.security_group_id]
-  availability_zone           = var.availability_zone
-  ebs_volume_size             = var.ebs_volume_size
-  ebs_volume_type             = var.ebs_volume_type
-  private_key_algorithm       = var.private_key_algorithm
-  private_key_rsa_bits        = var.private_key_rsa_bits
-  private_key_file_permission = var.private_key_file_permission
-  aws_region                  = var.aws_region
+  name_prefix                 = var.project_name
+  ami_id                      = local.ami_id
+  instance_type               = var.compute.instance_type
+  instance_count              = var.compute.instance_count
+  subnet_id                   = module.network.public_subnet_ids[var.compute.subnet_key]
+  associate_public_ip_address = var.network.public_subnets[var.compute.subnet_key].map_public_ip_on_launch
+  private_ip_start            = var.compute.private_ip_start
+  security_group_ids          = [module.application_security_group.id]
+  key_name                    = module.ssh_key.key_name
+  user_data                   = local.user_data
+  user_data_replace_on_change = true
+  data_volume                 = var.compute.data_volume
+
+  depends_on = [module.efs]
 }
 
-resource "aws_lb_target_group_attachment" "compute" {
-  count            = length(module.compute.instance_ids)
-  target_group_arn = module.network.target_group_arn
-  target_id        = module.compute.instance_ids[count.index]
-  port             = var.target_group_port
-}
+module "load_balancer" {
+  source = "./modules/load_balancer"
 
-resource "aws_lb_listener" "http" {
-  load_balancer_arn = module.network.alb_arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = module.network.target_group_arn
-  }
+  name_prefix        = var.project_name
+  vpc_id             = module.network.vpc_id
+  subnet_ids         = values(module.network.public_subnet_ids)
+  security_group_ids = [module.alb_security_group.id]
+  listener_port      = var.application.listener_port
+  target_port        = var.application.target_port
+  target_ids         = module.compute.instance_ids
+  health_check       = var.application.health_check
 }
