@@ -4,6 +4,10 @@ This Terraform root module creates a small web stack and composes focused,
 reusable child modules. The root configuration contains only environment
 choices; each child module owns one infrastructure concern.
 
+It is intended for learning and small demonstrations. The default configuration
+deploys two EC2 web servers behind an Application Load Balancer, with shared EFS
+storage and one encrypted EBS data volume per instance.
+
 ## Architecture
 
 ```text
@@ -24,6 +28,16 @@ The stack includes:
 - One or more EC2 instances with optional encrypted EBS data volumes
 - An encrypted EFS file system with one mount target per configured subnet
 - An optional Terraform-generated EC2 SSH key
+
+## Prerequisites
+
+- [Terraform](https://developer.hashicorp.com/terraform/install) 1.9 or later
+- An AWS account and credentials that can create the resources listed above
+- AWS credentials configured through the AWS CLI, environment variables, or
+  another method supported by the AWS provider
+
+The configuration uses AWS provider 6.x, Local provider 2.x, and TLS provider
+4.x. Exact provider selections are recorded in `.terraform.lock.hcl`.
 
 ## Project Structure
 
@@ -51,7 +65,37 @@ The stack includes:
     `-- ssh_key/
 ```
 
-## Configure
+## Quick Start
+
+1. Clone the repository and enter its directory.
+2. Review `terraform.tfvars`, especially the region and availability zones.
+3. Initialize and validate the configuration:
+
+   ```powershell
+   terraform init
+   terraform fmt -check -recursive
+   terraform validate
+   terraform test
+   ```
+
+4. Review and apply the proposed infrastructure:
+
+   ```powershell
+   terraform plan -out=tfplan
+   terraform apply tfplan
+   ```
+
+5. Open the URL returned by Terraform:
+
+   ```powershell
+   terraform output -raw application_url
+   ```
+
+`terraform test` uses mock providers, so it verifies module composition without
+creating resources or requiring AWS credentials. `plan` and `apply` use the real
+AWS provider and therefore require valid credentials.
+
+## Configuration
 
 Most settings have safe defaults. The only topology-specific input is the
 subnet map in `terraform.tfvars`:
@@ -96,32 +140,38 @@ compute = {
 }
 ```
 
-## Use
+Key root inputs are:
 
-```powershell
-terraform init
-terraform fmt -recursive
-terraform validate
-terraform test
-terraform plan
-terraform apply
-```
+| Input | Default | Purpose |
+| --- | --- | --- |
+| `aws_region` | `eu-central-1` | AWS region for the stack |
+| `project_name` | `web-server` | Naming and tagging prefix |
+| `network` | Required subnet map | VPC CIDR and public subnet topology |
+| `compute` | `{}` | Instance, AMI, SSH key, and EBS settings |
+| `application` | `{}` | Listener, target port, access CIDRs, and health check |
+| `tags` | `{}` | Additional tags applied to supported AWS resources |
 
-`terraform test` uses mock providers, so it verifies the full module
-composition without creating resources or requiring AWS credentials.
+See `variables.tf` for the full object schemas, defaults, and validation rules.
 
-After apply, Terraform prints `application_url`, instance addresses, subnet
-IDs, and EFS details:
+## Outputs
 
-```powershell
-terraform output application_url
-```
+After a successful apply, Terraform returns:
+
+- `application_url` and `alb_dns_name`
+- VPC, subnet, and security group identifiers
+- EC2 instance IDs and private/public IP addresses
+- EFS file system and mount-target details
+- `private_key_path` when Terraform generates an SSH key
 
 Destroy the training environment when it is no longer needed:
 
 ```powershell
 terraform destroy
 ```
+
+The stack creates billable AWS resources, including EC2 instances, EBS volumes,
+an Application Load Balancer, and EFS storage. Running `terraform destroy` stops
+future resource charges after AWS finishes deleting them.
 
 ## Reusing an Existing SSH Key
 
@@ -138,6 +188,19 @@ compute = {
 Generated private key material is stored in Terraform state and written to a
 local `.pem` file. Protect the state as sensitive data; for production, prefer
 an existing key or AWS Systems Manager Session Manager.
+
+## Security Notes
+
+- The load balancer is public by default because
+  `application.allowed_cidr_blocks` defaults to `0.0.0.0/0`; restrict it when a
+  public application is not required.
+- SSH ingress is disabled by default and validation rejects `0.0.0.0/0` as an
+  SSH source.
+- EC2 instances receive public IPs in this training architecture so first-boot
+  package installation works without a NAT gateway. For production, place
+  instances in private subnets and use managed egress.
+- Store Terraform state in a secure remote backend with encryption and access
+  controls before using this configuration for shared environments.
 
 ## Module Boundaries
 
